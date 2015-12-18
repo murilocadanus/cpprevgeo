@@ -3,11 +3,12 @@ CONFIG += console
 CONFIG -= app_bundle
 CONFIG -= qt
 
-INCLUDEPATH += include/
+INCLUDEPATH +=	include/ \
+				../libi9/include
 
 unix {
 	DEFINES	+= DEBUG
-	#LIBS	+= -lcurl
+	LIBS	+= -L ../build-libi9-Desktop_Qt_5_5_1_GCC_64bit-Debug -lI9
 
 	#Configs
 	APP_CONFIG_FILES.files = $$files($${PWD}/resources/configs/*.*)

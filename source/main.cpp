@@ -1,10 +1,7 @@
-#include <iostream>
+#include "RevGeoApp.hpp"
 
-using namespace std;
-
-int main()
+int main(int argc, char **argv)
 {
-	cout << "Hello World!" << endl;
-	return 0;
+	return I9Run<RevGeoApp>(argc, argv);
 }
 
