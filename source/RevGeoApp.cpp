@@ -12,12 +12,12 @@ RevGeoApp::~RevGeoApp()
 
 bool RevGeoApp::Initialize()
 {
-	IApp::Initialize();
+	return IApp::Initialize();
 }
 
 bool RevGeoApp::Update(f32 dt)
 {
-
+	return true;
 }
 
 bool RevGeoApp::Shutdown()

@@ -8,7 +8,7 @@ INCLUDEPATH +=	include/ \
 
 unix {
 	DEFINES	+= DEBUG
-	LIBS	+= -L ../build-libi9-Desktop_Qt_5_5_1_GCC_64bit-Debug -lI9
+	LIBS	+= -L ../libi9/build -lI9
 
 	#Configs
 	APP_CONFIG_FILES.files = $$files($${PWD}/resources/configs/*.*)
