@@ -17,6 +17,7 @@ bool RevGeoApp::Initialize()
 
 bool RevGeoApp::Update(f32 dt)
 {
+	Log("Test");
 	return true;
 }
 

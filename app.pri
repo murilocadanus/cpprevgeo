@@ -8,7 +8,7 @@ INCLUDEPATH +=	include/ \
 
 unix {
 	DEFINES	+= DEBUG
-	LIBS	+= -L ../libi9/build -lI9
+	LIBS	+= -L ../libi9/lib -lI9 -lphysfs -pthread
 
 	#Configs
 	APP_CONFIG_FILES.files = $$files($${PWD}/resources/configs/*.*)
