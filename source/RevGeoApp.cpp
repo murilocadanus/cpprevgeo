@@ -21,7 +21,15 @@ bool RevGeoApp::Initialize()
 bool RevGeoApp::Process()
 {
 	LibGeoWeb geoWeb;
-	Query query = QUERY("endereco" << "null");
+	BSONObj query = BSON( "$and" << BSON_ARRAY(
+						OR(	BSON("endereco" << ""),
+							BSON("endereco" << "null"),
+							BSON("endereco" << BSON(std::string("$type") << jstNULL))) <<
+						OR(
+							BSON("coordenadas.coordinates.0" << BSON("$lt" << 0)),
+							BSON("coordenadas.coordinates.1" << BSON("$lt" << 0)))
+					));
+
 	int countToUpdate = this->GetCountPosition(query);
 	std::cout << "[DATE] " << "Registros pendentes de atualizacao na collection posicao: " << countToUpdate << std::endl;
 
@@ -31,12 +39,15 @@ bool RevGeoApp::Process()
 
 	while (cursor->more())
 	{
-		BSONObj query_res = cursor->next();
+		BSONObj query_res = cursor->next();	
 		int veiculo = query_res.getField("veiculo").Int();
 		double lon = query_res.getFieldDotted("coordenadas.coordinates.0").Double();
 		double lat = query_res.getFieldDotted("coordenadas.coordinates.1").Double();
 
-		endereco_posicao_mapa data;
+		std::cout << query_res.getField("_id") << std::endl;
+		std::cout << "Veiculo: " << veiculo << std::endl;
+
+		endereco_posicao_mapa data = (const struct endereco_posicao_mapa){ NULL };
 
 		if(geoWeb.revGeoWeb(lat, lon, &data))
 		{
@@ -45,7 +56,7 @@ bool RevGeoApp::Process()
 			std::cout << "Municipio: " << data.municipio << std::endl;
 			std::cout << "Estado: " << data.uf << std::endl;
 			std::cout << "Numero: " << data.numero << std::endl;
-			std::cout << "PAIS: " << data.pais << std::endl;
+			std::cout << "Pais: " << data.pais << std::endl;
 
 			this->UpdatePosition(&data, veiculo);
 		}
@@ -53,6 +64,7 @@ bool RevGeoApp::Process()
 
 		std::cout << "---------------------------" << std::endl;
 	}
+	conn.done();
 
 	/*try {
 		mongo::ScopedDbConnection conn("mngdbsascloud.sasweb-fleet.net");
@@ -78,7 +90,10 @@ int RevGeoApp::GetCountPosition(Query query)
 	// $query = array('$and' => array(array('$or' => array(array("endereco" => null),array("endereco" => "null"),array("endereco" => ""))),array('$or' => array(array("coordenadas.coordinates.0" => array('$lt' => 0)),array("coordenadas.coordinates.1" => array('$lt' => 0))))));
 
 	ScopedDbConnection conn("mngdbsascloud.sasweb-fleet.net");
-	return conn->query("murilo.posicao", query).get()->itcount();
+	int totalPosition = conn->query("murilo.posicao", query).get()->itcount();
+	conn.done();
+
+	return totalPosition;
 }
 
 void RevGeoApp::UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId)
@@ -86,21 +101,50 @@ void RevGeoApp::UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId
 	ScopedDbConnection conn("mngdbsascloud.sasweb-fleet.net");
 	Query query = QUERY("veiculo" << veiculoId);
 
-	char updateSet[1000];
+	std::stringstream updateSet;
 
-	sprintf(updateSet, "{ $set: { ");
+	updateSet << "{ $set: { ";
 
-	sprintf(updateSet, "\"endereco\": \"%s\",", data->rua);
-	sprintf(updateSet, "\"bairro\": \"%s\",", data->bairro);
-	sprintf(updateSet, "\"municipio\": \"%s\",", data->municipio);
-	sprintf(updateSet, "\"estado\": \"%s\",", data->uf);
-	sprintf(updateSet, "\"numero\": \"%s\",", data->numero);
-	sprintf(updateSet, "\"pais\": \"%s\",", data->pais);
+	std::string numero;
+	if((data->numero != NULL) && (data->numero[0] != '\0')) numero = data->numero;
+	else numero = "0";
+	updateSet << "\"numero\": " << "\"" << numero << "\", ";
 
-	sprintf(updateSet, "} }");
+	std::string velocidadeVia = "";
+	updateSet << "\"velocidadeVia\": " << "\"" << velocidadeVia << "\", ";
 
-	std::cout << updateSet << std::endl;
+	std::string endereco;
+	if((data->rua != NULL) && (data->rua[0] != '\0')) endereco = data->rua;
+	else endereco = "";
+	updateSet << "\"endereco\": " << "\"" << endereco << "\", ";
 
-	//BSONObj updatePacket = fromjson(updateSet);
-	//conn->update("murilo.posicao", query, updatePacket);
+	std::string distancia = "";
+	updateSet << "\"distancia\": " << "\"" << distancia << "\", ";
+
+	std::string bairro;
+	if((data->bairro != NULL) && (data->bairro[0] != '\0')) bairro = data->bairro;
+	else bairro = "";
+	updateSet << "\"bairro\": " << "\"" << bairro << "\", ";
+
+	std::string municipio;
+	if((data->municipio != NULL) && (data->municipio[0] != '\0')) municipio = data->municipio;
+	else municipio = "";
+	updateSet << "\"municipio\": " << "\"" << municipio << "\", ";
+
+	std::string uf;
+	if((data->uf != NULL) && (data->uf[0] != '\0')) uf = data->uf;
+	else uf = "";
+	updateSet << "\"estado\": " << "\"" << data->uf << "\", ";
+
+	std::string pais;
+	if((data->pais != NULL) && (data->pais[0] != '\0')) pais = data->pais;
+	else pais = "";
+	updateSet << "\"pais\": " << "\"" << pais << "\"";
+
+	updateSet << "} }";
+
+	std::cout << updateSet.str() << std::endl;
+
+	BSONObj updatePacket = fromjson(updateSet.str());
+	conn->update("murilo.posicao", query, updatePacket, false, true);
 }

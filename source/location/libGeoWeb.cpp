@@ -48,11 +48,12 @@ int32_t LibGeoWeb::revGeoWeb( double latit, double longit, struct endereco_posic
 	// Declara as variaveis para fazer o request da resolucao de endereco.
 	Document document;
 
+	headers = NULL;
 	readBufferRevgeo.clear();
 
 	//Inicializa CURL apenas umas vez por programa, quando for chamado
-	if(curlPostRevgeo == NULL)
-	{
+	//if(curlPostRevgeo == NULL)
+	//{
 		// Configura o header para o request
 		headers = curl_slist_append(headers, "Accept: application/json");
 		headers = curl_slist_append(headers, "Content-Type: application/json");
@@ -61,21 +62,27 @@ int32_t LibGeoWeb::revGeoWeb( double latit, double longit, struct endereco_posic
 		//Monta CURL para request
 		curlPostRevgeo = curl_easy_init();
 		curl_easy_setopt(curlPostRevgeo, CURLOPT_HTTPHEADER, headers);
-		curl_easy_setopt(curlPostRevgeo, CURLOPT_POST, 0);
+		curl_easy_setopt(curlPostRevgeo, CURLOPT_HTTPGET, 1);
 		curl_easy_setopt(curlPostRevgeo, CURLOPT_WRITEFUNCTION, writeCurlCallback);
 		curl_easy_setopt(curlPostRevgeo, CURLOPT_WRITEDATA, &readBufferRevgeo);
 		curl_easy_setopt(curlPostRevgeo, CURLOPT_TIMEOUT, REV_GEO_TIMEOUT);
-	}
+	//}
 
 	// Faz o request com curl
 	//curl_easy_setopt(curlPostRevgeo, CURLOPT_POSTFIELDSIZE, strlen(webParams));
 	//curl_easy_setopt(curlPostRevgeo, CURLOPT_POSTFIELDS, webParams);
 
 	// Cria os parametros para o request
-	sprintf(urlWithParams, "https://maps.google.com/maps/api/geocode/json?latlng=%fl,%lf&sensor=false&key=AIzaSyCgIsGUoox-_-bD2o2d2bzrWru4SXFDZRs", latit, longit);
+	sprintf(urlWithParams, "https://maps.google.com/maps/api/geocode/json?latlng=%lf,%lf&sensor=false&key=AIzaSyCgIsGUoox-_-bD2o2d2bzrWru4SXFDZRs", latit, longit);
 	curl_easy_setopt(curlPostRevgeo, CURLOPT_URL, urlWithParams);
 
 	resultURLCode = curl_easy_perform(curlPostRevgeo);
+
+	if(resultURLCode != CURLE_OK)
+	{
+		fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(resultURLCode));
+		return 0;
+	}
 
 	// Verifica se o endereco foi encontrado
 	if (readBufferRevgeo.length() == 0) {
@@ -106,7 +113,7 @@ int32_t LibGeoWeb::revGeoWeb( double latit, double longit, struct endereco_posic
 		// Faz a coversao de UTF-8 para ISO-8859-1 do pais.
 		if (type == "country")
 		{
-			std::string pais = addresses[i]["long_name"].GetString();
+			std::string pais = addresses[i]["short_name"].GetString();
 			converteEncode( "UTF8",
 							"LATIN1",
 							(char*) pais.c_str(),
@@ -119,7 +126,7 @@ int32_t LibGeoWeb::revGeoWeb( double latit, double longit, struct endereco_posic
 		// Faz a coversao de UTF-8 para ISO-8859-1 do estado.
 		if (type == "administrative_area_level_1")
 		{
-			std::string uf = addresses[i]["long_name"].GetString();
+			std::string uf = addresses[i]["short_name"].GetString();
 			converteEncode( "UTF8",
 							"LATIN1",
 							(char*) uf.c_str(),
@@ -182,6 +189,11 @@ int32_t LibGeoWeb::revGeoWeb( double latit, double longit, struct endereco_posic
 			end->numero[strlen(numero.c_str())] = '\0';
 		}
 	}
+
+	curl_slist_free_all(headers);
+
+	/* always cleanup */
+	curl_easy_cleanup(curlPostRevgeo);
 
 	// C'est fini
 	return 1;
