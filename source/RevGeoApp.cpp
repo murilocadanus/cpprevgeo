@@ -1,6 +1,17 @@
 #include "RevGeoApp.hpp"
 #include "location/libGeoWeb.hpp"
 
+#define REVGEO_TAG "[RevGeo] "
+
+const BSONObj RevGeoApp::kQueryGet = BSON("$and" << BSON_ARRAY(
+										OR(	BSON("endereco" << ""),
+											BSON("endereco" << "null"),
+											BSON("endereco" << BSON(std::string("$type") << jstNULL))) <<
+										OR(
+											BSON("coordenadas.coordinates.0" << BSON("$lt" << 0)),
+											BSON("coordenadas.coordinates.1" << BSON("$lt" << 0)))
+									));
+
 RevGeoApp::RevGeoApp()
 {
 }
@@ -11,86 +22,88 @@ RevGeoApp::~RevGeoApp()
 
 bool RevGeoApp::Initialize()
 {
+	Info(REVGEO_TAG "Initializing...");
+
+	// Init mongo client
 	mongo::client::initialize();
-	//	if (this->Initialize())
-	this->Process();
-	//	Shutdown();
+
 	return true;
 }
 
-void RevGeoApp::Process()
+bool RevGeoApp::Process()
 {
+	Info(REVGEO_TAG "Processing...");
 	LibGeoWeb geoWeb;
-	BSONObj query = BSON( "$and" << BSON_ARRAY(
-						OR(	BSON("endereco" << ""),
-							BSON("endereco" << "null"),
-							BSON("endereco" << BSON(std::string("$type") << jstNULL))) <<
-						OR(
-							BSON("coordenadas.coordinates.0" << BSON("$lt" << 0)),
-							BSON("coordenadas.coordinates.1" << BSON("$lt" << 0)))
-					));
 
-	int countToUpdate = this->GetCountPosition(query);
-	std::cout << "[DATE] " << "Registros pendentes de atualizacao na collection posicao: " << countToUpdate << std::endl;
-
-	// Get Position
-	ScopedDbConnection conn("mngdbsascloud.sasweb-fleet.net");
-	std::auto_ptr<DBClientCursor> cursor = conn->query("murilo.posicao", query);
-
-	while (cursor->more())
+	try
 	{
-		BSONObj query_res = cursor->next();	
-		int veiculo = query_res.getField("veiculo").Int();
-		double lon = query_res.getFieldDotted("coordenadas.coordinates.0").Double();
-		double lat = query_res.getFieldDotted("coordenadas.coordinates.1").Double();
+		// Get total position
+		int countToUpdate = this->GetCountPosition();
+		Info(REVGEO_TAG "Total data gathered from position collection: %d", countToUpdate);
 
-		std::cout << query_res.getField("_id") << std::endl;
-		std::cout << "Veiculo: " << veiculo << std::endl;
+		// Get position
+		ScopedDbConnection conn("mngdbsascloud.sasweb-fleet.net");
+		std::auto_ptr<DBClientCursor> cursor = conn->query("murilo.posicao", kQueryGet);
 
-		endereco_posicao_mapa data = (const struct endereco_posicao_mapa){ NULL };
-
-		if(geoWeb.revGeoWeb(lat, lon, &data))
+		// Iterate all position to update
+		while (cursor->more())
 		{
-			std::cout << "Rua: " << data.rua << std::endl;
-			std::cout << "Bairro: " << data.bairro << std::endl;
-			std::cout << "Municipio: " << data.municipio << std::endl;
-			std::cout << "Estado: " << data.uf << std::endl;
-			std::cout << "Numero: " << data.numero << std::endl;
-			std::cout << "Pais: " << data.pais << std::endl;
+			BSONObj query_res = cursor->next();
 
-			this->UpdatePosition(&data, veiculo);
+			// Get mongodb attributes to use as entry data
+			int veiculo = query_res.getField("veiculo").Int();
+			double lon = query_res.getFieldDotted("coordenadas.coordinates.0").Double();
+			double lat = query_res.getFieldDotted("coordenadas.coordinates.1").Double();
+
+			// Init the struct with empty values to storage callback values
+			endereco_posicao_mapa data = (const struct endereco_posicao_mapa){ NULL };
+
+			Info(REVGEO_TAG "--------------------");
+			Info(REVGEO_TAG "OID: %d", query_res.getField("_id"));
+			Info(REVGEO_TAG "Veiculo: %d", veiculo);
+
+			// Call a WS for reverse geolocation
+			if(geoWeb.revGeoWeb(lat, lon, &data))
+			{
+				Info(REVGEO_TAG "Rua: %s", data.rua);
+				Info(REVGEO_TAG "Bairro: %s", data.bairro);
+				Info(REVGEO_TAG "Municipio: %s", data.municipio);
+				Info(REVGEO_TAG "Uf: %s", data.uf);
+				Info(REVGEO_TAG "Numero: %s", data.numero);
+				Info(REVGEO_TAG "Pais: %s", data.pais);
+
+				// Update mongodb position data
+				this->UpdatePosition(&data, veiculo);
+			}
+			else
+			{
+				Info(REVGEO_TAG "Can't get JSON data");
+				continue;
+			}
+
+			Info(REVGEO_TAG "--------------------");
 		}
-		else continue;
-
-		std::cout << "---------------------------" << std::endl;
-	}
-	conn.done();
-
-	/*try {
-		mongo::ScopedDbConnection conn("mngdbsascloud.sasweb-fleet.net");
-
-		auto_ptr<DBClientCursor> cursor = conn->query(mongoUltimaPosicao, QUERY("veiculo" << veiculoId));
-
-		std::cout << "connected ok" << std::endl;
+		conn.done();
 
 		return EXIT_SUCCESS;
-	} catch( const mongo::DBException &e ) {
-		std::cout << "caught " << e.what() << std::endl;
 	}
-	return EXIT_SUCCESS;*/
+	catch(const mongo::DBException &e)
+	{
+		Error(REVGEO_TAG "Failed to connect to mongodb: %s", e.what());
+		return EXIT_FAILURE;
+	}
 }
 
 bool RevGeoApp::Shutdown()
 {
-	return IApp::Shutdown();
+	Info(REVGEO_TAG "Shutting down...");
+	return true;
 }
 
-int RevGeoApp::GetCountPosition(Query query)
+int RevGeoApp::GetCountPosition()
 {
-	// $query = array('$and' => array(array('$or' => array(array("endereco" => null),array("endereco" => "null"),array("endereco" => ""))),array('$or' => array(array("coordenadas.coordinates.0" => array('$lt' => 0)),array("coordenadas.coordinates.1" => array('$lt' => 0))))));
-
 	ScopedDbConnection conn("mngdbsascloud.sasweb-fleet.net");
-	int totalPosition = conn->query("murilo.posicao", query).get()->itcount();
+	int totalPosition = conn->query("murilo.posicao", kQueryGet).get()->itcount();
 	conn.done();
 
 	return totalPosition;
@@ -101,50 +114,28 @@ void RevGeoApp::UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId
 	ScopedDbConnection conn("mngdbsascloud.sasweb-fleet.net");
 	Query query = QUERY("veiculo" << veiculoId);
 
-	std::stringstream updateSet;
-
-	updateSet << "{ $set: { ";
-
-	std::string numero;
-	if((data->numero != NULL) && (data->numero[0] != '\0')) numero = data->numero;
-	else numero = "0";
-	updateSet << "\"numero\": " << "\"" << numero << "\", ";
-
+	// Verify data gathered from WS
+	std::string numero = ((data->numero != NULL) && (data->numero[0] != '\0')) ? data->numero : "0";
 	std::string velocidadeVia = "";
-	updateSet << "\"velocidadeVia\": " << "\"" << velocidadeVia << "\", ";
-
-	std::string endereco;
-	if((data->rua != NULL) && (data->rua[0] != '\0')) endereco = data->rua;
-	else endereco = "";
-	updateSet << "\"endereco\": " << "\"" << endereco << "\", ";
-
+	std::string endereco = ((data->rua != NULL) && (data->rua[0] != '\0')) ? data->rua : "";
 	std::string distancia = "";
-	updateSet << "\"distancia\": " << "\"" << distancia << "\", ";
+	std::string bairro = ((data->bairro != NULL) && (data->bairro[0] != '\0')) ? data->bairro : "";
+	std::string municipio = ((data->municipio != NULL) && (data->municipio[0] != '\0')) ? data->municipio : "";
+	std::string uf = ((data->uf != NULL) && (data->uf[0] != '\0')) ? data->uf : "";
+	std::string pais = ((data->pais != NULL) && (data->pais[0] != '\0')) ? data->pais : "";
 
-	std::string bairro;
-	if((data->bairro != NULL) && (data->bairro[0] != '\0')) bairro = data->bairro;
-	else bairro = "";
-	updateSet << "\"bairro\": " << "\"" << bairro << "\", ";
+	// Create update query
+	BSONObj querySet = BSON("$set" << BSON(
+										"numero"		<< numero	<< "velocidadeVia"	<< velocidadeVia <<
+										"endereco"		<< endereco	<< "distancia"		<< distancia <<
+										"bairro"		<< bairro	<< "municipio"		<< municipio <<
+										"estado"		<< uf		<< "pais"			<< pais
+										)
+							);
 
-	std::string municipio;
-	if((data->municipio != NULL) && (data->municipio[0] != '\0')) municipio = data->municipio;
-	else municipio = "";
-	updateSet << "\"municipio\": " << "\"" << municipio << "\", ";
+	Info(REVGEO_TAG "Update querySet: %s", querySet.toString().c_str());
 
-	std::string uf;
-	if((data->uf != NULL) && (data->uf[0] != '\0')) uf = data->uf;
-	else uf = "";
-	updateSet << "\"estado\": " << "\"" << data->uf << "\", ";
-
-	std::string pais;
-	if((data->pais != NULL) && (data->pais[0] != '\0')) pais = data->pais;
-	else pais = "";
-	updateSet << "\"pais\": " << "\"" << pais << "\"";
-
-	updateSet << "} }";
-
-	std::cout << updateSet.str() << std::endl;
-
-	BSONObj updatePacket = fromjson(updateSet.str());
-	conn->update("murilo.posicao", query, updatePacket, false, true);
+	// Updating based on vehicle id with multiple parameter
+	conn->update("murilo.posicao", query, querySet, false, true);
+	conn.done();
 }

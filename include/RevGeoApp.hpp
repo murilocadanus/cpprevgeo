@@ -16,11 +16,13 @@ class RevGeoApp : public IApp
 		virtual ~RevGeoApp();
 
 		virtual bool Initialize();
-		virtual void Process() override;
+		virtual bool Process() override;
 		virtual bool Shutdown() override;
 
+		static const BSONObj kQueryGet;
+
 	private:
-		int GetCountPosition(Query query);
+		int GetCountPosition();
 		void UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId);
 
 };
