@@ -3,22 +3,22 @@
 
 RevGeoApp::RevGeoApp()
 {
-	if (this->Initialize())
-		this->Process();
 }
 
 RevGeoApp::~RevGeoApp()
 {
-	Shutdown();
 }
 
 bool RevGeoApp::Initialize()
 {
 	mongo::client::initialize();
+	//	if (this->Initialize())
+	this->Process();
+	//	Shutdown();
 	return true;
 }
 
-bool RevGeoApp::Process()
+void RevGeoApp::Process()
 {
 	LibGeoWeb geoWeb;
 	BSONObj query = BSON( "$and" << BSON_ARRAY(
@@ -82,7 +82,7 @@ bool RevGeoApp::Process()
 
 bool RevGeoApp::Shutdown()
 {
-	return true;//IApp::Shutdown();
+	return IApp::Shutdown();
 }
 
 int RevGeoApp::GetCountPosition(Query query)

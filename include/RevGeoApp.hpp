@@ -6,18 +6,18 @@
 #include <iostream>
 #include "mongo/client/dbclient.h" // for the driver
 
-//using namespace Sascar;
+using namespace Sascar;
 using namespace mongo;
 
-class RevGeoApp// : public IApp
+class RevGeoApp : public IApp
 {
 	public:
 		RevGeoApp();
 		virtual ~RevGeoApp();
 
 		virtual bool Initialize();
-		virtual bool Process();
-		virtual bool Shutdown();
+		virtual void Process() override;
+		virtual bool Shutdown() override;
 
 	private:
 		int GetCountPosition(Query query);
