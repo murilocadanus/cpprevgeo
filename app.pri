@@ -8,8 +8,7 @@ INCLUDEPATH +=	include/ \
 
 unix {
 	DEFINES	+= DEBUG
-	#LIBS	+= -L ../libi9/lib -lI9 -lphysfs -lyajl_s -lmongocxx -lbsoncxx -pthread
-	LIBS	+= -pthread -lmongoclient -lcurl -lboost_system -lboost_thread-mt -L ../libi9/lib -lI9
+	LIBS	+= -L ../libi9/lib -lI9 -pthread -lmongoclient -lcurl -lboost_system -lboost_thread-mt
 
 	#Configs
 	APP_CONFIG_FILES.files = $$files($${PWD}/resources/configs/*.*)

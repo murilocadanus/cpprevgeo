@@ -1,10 +1,7 @@
-SOURCES +=	source/location/libGeoWeb.cpp \
-			source/main.cpp \
+SOURCES +=	source/main.cpp \
 			source/RevGeoApp.cpp
 
-HEADERS +=	include/location/libGeoWeb.hpp \
-			include/location/revgeo.hpp \
-			include/RevGeoApp.hpp \
+HEADERS +=	include/RevGeoApp.hpp \
 			include/Defines.hpp \
 			include/revgeo.hpp
 
