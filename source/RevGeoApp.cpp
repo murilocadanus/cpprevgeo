@@ -1,5 +1,6 @@
 #include "RevGeoApp.hpp"
 #include "location/libGeoWeb.hpp"
+#include "Configuration.hpp"
 
 #define REVGEO_TAG "[RevGeo] "
 
@@ -42,8 +43,8 @@ bool RevGeoApp::Process()
 		Info(REVGEO_TAG "Total data gathered from position collection: %d", countToUpdate);
 
 		// Get position
-		ScopedDbConnection conn("mngdbsascloud.sasweb-fleet.net");
-		std::auto_ptr<DBClientCursor> cursor = conn->query("murilo.posicao", kQueryGet);
+		ScopedDbConnection conn(pConfiguration->GetMongoDBHost());
+		std::auto_ptr<DBClientCursor> cursor = conn->query(pConfiguration->GetMongoDBCollection(), kQueryGet);
 
 		// Iterate all position to update
 		while (cursor->more())
@@ -102,8 +103,8 @@ bool RevGeoApp::Shutdown()
 
 int RevGeoApp::GetCountPosition()
 {
-	ScopedDbConnection conn("mngdbsascloud.sasweb-fleet.net");
-	int totalPosition = conn->query("murilo.posicao", kQueryGet).get()->itcount();
+	ScopedDbConnection conn(pConfiguration->GetMongoDBHost());
+	int totalPosition = conn->query(pConfiguration->GetMongoDBCollection(), kQueryGet).get()->itcount();
 	conn.done();
 
 	return totalPosition;
@@ -111,7 +112,7 @@ int RevGeoApp::GetCountPosition()
 
 void RevGeoApp::UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId)
 {
-	ScopedDbConnection conn("mngdbsascloud.sasweb-fleet.net");
+	ScopedDbConnection conn(pConfiguration->GetMongoDBHost());
 	Query query = QUERY("veiculo" << veiculoId);
 
 	// Verify data gathered from WS
@@ -136,6 +137,6 @@ void RevGeoApp::UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId
 	Info(REVGEO_TAG "Update querySet: %s", querySet.toString().c_str());
 
 	// Updating based on vehicle id with multiple parameter
-	conn->update("murilo.posicao", query, querySet, false, true);
+	conn->update(pConfiguration->GetMongoDBCollection(), query, querySet, false, true);
 	conn.done();
 }
