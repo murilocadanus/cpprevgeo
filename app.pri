@@ -8,11 +8,11 @@ INCLUDEPATH +=	include/ \
 
 unix {
 	DEFINES	+= DEBUG
-	LIBS	+= -L ../libi9/lib -lI9 -pthread -lmongoclient -lcurl -lboost_system -lboost_thread-mt
+	LIBS	+= -L ../libi9/lib -lI9 -pthread -lmongoclient -lcurl -lyajl -lboost_system -lboost_thread-mt
 
 	#Configs
-	APP_CONFIG_FILES.files = $$files($${PWD}/resources/configs/*.*)
-	APP_CONFIG_FILES.path = $${OUT_PWD}/$${DESTDIR}/configs
+	APP_CONFIG_FILES.files = $$files($${PWD}/resources/*.*)
+	APP_CONFIG_FILES.path = $${OUT_PWD}/$${DESTDIR}
 	APP_CONFIG_FILES.commands += test -d $${APP_CONFIG_FILES.path} || mkdir -p $${APP_CONFIG_FILES.path} &&
 	APP_CONFIG_FILES.commands += ${COPY_FILE} $$APP_CONFIG_FILES.files $${APP_CONFIG_FILES.path}
 

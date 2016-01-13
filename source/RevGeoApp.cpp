@@ -33,7 +33,7 @@ bool RevGeoApp::Initialize()
 
 bool RevGeoApp::Process()
 {
-	Info(REVGEO_TAG "Processing...");
+	Info(REVGEO_TAG "Start processing...");
 	LibGeoWeb geoWeb;
 
 	try
@@ -85,6 +85,10 @@ bool RevGeoApp::Process()
 			Info(REVGEO_TAG "--------------------");
 		}
 		conn.done();
+		Info(REVGEO_TAG "Finish processing...");
+
+		// Config a time to wait until the next process
+		sleep(10);
 
 		return EXIT_SUCCESS;
 	}
@@ -118,12 +122,12 @@ void RevGeoApp::UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId
 	// Verify data gathered from WS
 	std::string numero = ((data->numero != NULL) && (data->numero[0] != '\0')) ? data->numero : "0";
 	std::string velocidadeVia = "";
-	std::string endereco = ((data->rua != NULL) && (data->rua[0] != '\0')) ? data->rua : "";
+	std::string endereco = ((data->rua != NULL) && (data->rua[0] != '\0')) ? data->rua : "SEM ENDERECO";
 	std::string distancia = "";
 	std::string bairro = ((data->bairro != NULL) && (data->bairro[0] != '\0')) ? data->bairro : "";
-	std::string municipio = ((data->municipio != NULL) && (data->municipio[0] != '\0')) ? data->municipio : "";
-	std::string uf = ((data->uf != NULL) && (data->uf[0] != '\0')) ? data->uf : "";
-	std::string pais = ((data->pais != NULL) && (data->pais[0] != '\0')) ? data->pais : "";
+	std::string municipio = ((data->municipio != NULL) && (data->municipio[0] != '\0')) ? data->municipio : "?";
+	std::string uf = ((data->uf != NULL) && (data->uf[0] != '\0')) ? data->uf : "?";
+	std::string pais = ((data->pais != NULL) && (data->pais[0] != '\0')) ? data->pais : "?";
 
 	// Create update query
 	BSONObj querySet = BSON("$set" << BSON(
