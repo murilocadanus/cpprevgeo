@@ -20,6 +20,7 @@ class RevGeoApp : public IApp
 		virtual bool Shutdown() override;
 
 		static const BSONObj kQueryGet;
+		static const u_int8_t kQueryGetLimit;
 
 	private:
 		int GetCountPosition();

@@ -13,6 +13,8 @@ const BSONObj RevGeoApp::kQueryGet = BSON("$and" << BSON_ARRAY(
 											BSON("coordenadas.coordinates.1" << BSON("$lt" << 0)))
 									));
 
+const u_int8_t RevGeoApp::kQueryGetLimit = 500;
+
 RevGeoApp::RevGeoApp()
 {
 }
@@ -44,7 +46,7 @@ bool RevGeoApp::Process()
 
 		// Get position
 		ScopedDbConnection conn(pConfiguration->GetMongoDBHost());
-		std::auto_ptr<DBClientCursor> cursor = conn->query(pConfiguration->GetMongoDBCollection(), kQueryGet);
+		std::auto_ptr<DBClientCursor> cursor = conn->query(pConfiguration->GetMongoDBCollection(), kQueryGet, kQueryGetLimit);
 
 		// Iterate all position to update
 		while (cursor->more())
@@ -52,7 +54,8 @@ bool RevGeoApp::Process()
 			BSONObj query_res = cursor->next();
 
 			// Get mongodb attributes to use as entry data
-			int veiculo = query_res.getField("veiculo").Int();
+			u_int64_t veiculo = query_res.getField("veiculo").safeNumberLong();
+
 			double lon = query_res.getFieldDotted("coordenadas.coordinates.0").Double();
 			double lat = query_res.getFieldDotted("coordenadas.coordinates.1").Double();
 
