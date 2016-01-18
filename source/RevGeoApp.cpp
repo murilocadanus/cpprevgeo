@@ -54,7 +54,7 @@ bool RevGeoApp::Process()
 			BSONObj query_res = cursor->next();
 
 			// Get mongodb attributes to use as entry data
-			int veiculo = query_res.getField("veiculo").numberLong();
+			int veiculo = query_res.getField("veiculo").Number();
 
 			double lon = query_res.getFieldDotted("coordenadas.coordinates.0").Double();
 			double lat = query_res.getFieldDotted("coordenadas.coordinates.1").Double();
@@ -66,8 +66,11 @@ bool RevGeoApp::Process()
 			Info(REVGEO_TAG "%s - OID: %d", pConfiguration->GetTitle().c_str(), query_res.getField("_id"));
 			Info(REVGEO_TAG "%s - Veiculo: %d", pConfiguration->GetTitle().c_str(), veiculo);
 
+			// Create the URL
+			geoWeb.Url(pConfiguration->GetServiceURL().c_str(), lat, lon, pConfiguration->GetServiceKey().c_str());
+
 			// Call a WS for reverse geolocation
-			if(geoWeb.revGeoWeb(lat, lon, &data))
+			if(geoWeb.revGeoWeb(&data, pConfiguration->GetServiceTimeOut()))
 			{
 				Info(REVGEO_TAG "%s - Rua: %s", pConfiguration->GetTitle().c_str(), data.rua);
 				Info(REVGEO_TAG "%s - Bairro: %s", pConfiguration->GetTitle().c_str(), data.bairro);
