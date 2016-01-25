@@ -30,7 +30,18 @@ bool RevGeoApp::Initialize()
 	// Init mongo client
 	mongo::client::initialize();
 
-	return true;
+	// Connect to mongo client
+	try
+	{
+		cDBConnection.connect(pConfiguration->GetMongoDBHost());
+		Info(REVGEO_TAG "%s - Connected to mongodb", pConfiguration->GetTitle().c_str());
+		return true;
+	}
+	catch(const mongo::DBException &e)
+	{
+		Error(REVGEO_TAG "%s - Failed to connect to mongodb: %s", pConfiguration->GetTitle().c_str(), e.what());
+		return false;
+	}
 }
 
 bool RevGeoApp::Process()
@@ -45,8 +56,7 @@ bool RevGeoApp::Process()
 		Info(REVGEO_TAG "%s - Total data gathered from position collection: %d", pConfiguration->GetTitle().c_str(), countToUpdate);
 
 		// Get position
-		ScopedDbConnection conn(pConfiguration->GetMongoDBHost());
-		std::auto_ptr<DBClientCursor> cursor = conn->query(pConfiguration->GetMongoDBCollection(), kQueryGet, kQueryGetLimit);
+		std::auto_ptr<DBClientCursor> cursor = cDBConnection.query(pConfiguration->GetMongoDBCollection(), kQueryGet, kQueryGetLimit);
 
 		// Iterate all position to update
 		while (cursor->more())
@@ -90,39 +100,44 @@ bool RevGeoApp::Process()
 
 			Info(REVGEO_TAG "%s - --------------------", pConfiguration->GetTitle().c_str());
 		}
-		conn.done();
 		Info(REVGEO_TAG "%s - Finish processing...", pConfiguration->GetTitle().c_str());
 
 		// Config a time to wait until the next process
-		sleep(10);
+		sleep(pConfiguration->GetSleepProcessInterval());
 
 		return EXIT_SUCCESS;
 	}
 	catch(const mongo::DBException &e)
 	{
 		Error(REVGEO_TAG "%s - Failed to connect to mongodb: %s", pConfiguration->GetTitle().c_str(), e.what());
-		return EXIT_FAILURE;
+
+		// Force to ignore excptions
+		//return EXIT_FAILURE;
+
+		return EXIT_SUCCESS;
 	}
 }
 
 bool RevGeoApp::Shutdown()
 {
 	Info(REVGEO_TAG "%s - Shutting down...", pConfiguration->GetTitle().c_str());
+
+	// Desconnect from mongodb
+	BSONObj info;
+	cDBConnection.logout(pConfiguration->GetMongoDBHost(), info);
+	Info(REVGEO_TAG "%s - Disconnected from mongodb...", pConfiguration->GetTitle().c_str());
+
 	return true;
 }
 
 int RevGeoApp::GetCountPosition()
 {
-	ScopedDbConnection conn(pConfiguration->GetMongoDBHost());
-	int totalPosition = conn->query(pConfiguration->GetMongoDBCollection(), kQueryGet).get()->itcount();
-	conn.done();
-
+	int totalPosition = cDBConnection.query(pConfiguration->GetMongoDBCollection(), kQueryGet).get()->itcount();
 	return totalPosition;
 }
 
 void RevGeoApp::UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId)
 {
-	ScopedDbConnection conn(pConfiguration->GetMongoDBHost());
 	Query query = QUERY("veiculo" << veiculoId);
 
 	// Verify data gathered from WS
@@ -147,6 +162,5 @@ void RevGeoApp::UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId
 	Info(REVGEO_TAG "%s - Update querySet: %s", pConfiguration->GetTitle().c_str(), querySet.toString().c_str());
 
 	// Updating based on vehicle id with multiple parameter
-	conn->update(pConfiguration->GetMongoDBCollection(), query, querySet, false, true);
-	conn.done();
+	cDBConnection.update(pConfiguration->GetMongoDBCollection(), query, querySet, false, true);
 }

@@ -26,6 +26,8 @@ class RevGeoApp : public IApp
 		int GetCountPosition();
 		void UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId);
 
+		DBClientConnection cDBConnection;
+
 };
 
 #endif // REVGEOAPP_HPP
