@@ -61,10 +61,10 @@ bool RevGeoApp::Process()
 		{
 			BSONObj query_res = cursor->next();
 
-			if(query_res.getField("veiculo").isNumber())
+			if(query_res.getIntField("veiculo") > 0)
 			{
 				// Get mongodb attributes to use as entry data
-				int veiculo = query_res.getField("veiculo").Number();
+				int veiculo = query_res.getIntField("veiculo");
 
 				double lon = query_res.getFieldDotted("coordenadas.coordinates.0").Double();
 				double lat = query_res.getFieldDotted("coordenadas.coordinates.1").Double();
