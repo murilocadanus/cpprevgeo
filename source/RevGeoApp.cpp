@@ -13,8 +13,6 @@ const BSONObj RevGeoApp::kQueryGet = BSON("$and" << BSON_ARRAY(
 											BSON("coordenadas.coordinates.1" << BSON("$lt" << 0)))
 									));
 
-const u_int8_t RevGeoApp::kQueryGetLimit = 500;
-
 RevGeoApp::RevGeoApp()
 {
 }
@@ -56,7 +54,7 @@ bool RevGeoApp::Process()
 		Info(REVGEO_TAG "%s - Total data gathered from position collection: %d", pConfiguration->GetTitle().c_str(), countToUpdate);
 
 		// Get position
-		std::auto_ptr<DBClientCursor> cursor = cDBConnection.query(pConfiguration->GetMongoDBCollection(), kQueryGet, kQueryGetLimit);
+		std::auto_ptr<DBClientCursor> cursor = cDBConnection.query(pConfiguration->GetMongoDBCollection(), kQueryGet, pConfiguration->GetQueryLimit());
 
 		// Iterate all position to update
 		while (cursor->more())
