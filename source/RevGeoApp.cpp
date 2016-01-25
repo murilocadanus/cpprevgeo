@@ -100,7 +100,11 @@ bool RevGeoApp::Process()
 
 				Info(REVGEO_TAG "%s - --------------------", pConfiguration->GetTitle().c_str());
 			}
-			else continue;
+			else
+			{
+				Info(REVGEO_TAG "%s - Invalid veiculo field type", pConfiguration->GetTitle().c_str());
+				continue;
+			}
 		}
 		Info(REVGEO_TAG "%s - Finish processing...", pConfiguration->GetTitle().c_str());
 
