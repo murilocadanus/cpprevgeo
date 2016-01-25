@@ -62,7 +62,7 @@ bool RevGeoApp::Process()
 			BSONObj query_res = cursor->next();
 
 			// Get mongodb attributes to use as entry data
-			int veiculo = query_res.getField("veiculo").Number();
+			int veiculo = query_res.getIntField("veiculo");
 
 			double lon = query_res.getFieldDotted("coordenadas.coordinates.0").Double();
 			double lat = query_res.getFieldDotted("coordenadas.coordinates.1").Double();
