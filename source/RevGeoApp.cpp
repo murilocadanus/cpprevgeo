@@ -61,42 +61,46 @@ bool RevGeoApp::Process()
 		{
 			BSONObj query_res = cursor->next();
 
-			// Get mongodb attributes to use as entry data
-			int veiculo = query_res.getIntField("veiculo");
-
-			double lon = query_res.getFieldDotted("coordenadas.coordinates.0").Double();
-			double lat = query_res.getFieldDotted("coordenadas.coordinates.1").Double();
-
-			// Init the struct with empty values to storage callback values
-			endereco_posicao_mapa data = (const struct endereco_posicao_mapa){ NULL };
-
-			Info(REVGEO_TAG "%s - --------------------", pConfiguration->GetTitle().c_str());
-			Info(REVGEO_TAG "%s - OID: %d", pConfiguration->GetTitle().c_str(), query_res.getField("_id"));
-			Info(REVGEO_TAG "%s - Veiculo: %d", pConfiguration->GetTitle().c_str(), veiculo);
-
-			// Create the URL
-			geoWeb.Url(pConfiguration->GetServiceURL().c_str(), lat, lon, pConfiguration->GetServiceKey().c_str());
-
-			// Call a WS for reverse geolocation
-			if(geoWeb.revGeoWeb(&data, pConfiguration->GetServiceTimeOut()))
+			if(query_res.getField("veiculo").isNumber())
 			{
-				Info(REVGEO_TAG "%s - Rua: %s", pConfiguration->GetTitle().c_str(), data.rua);
-				Info(REVGEO_TAG "%s - Bairro: %s", pConfiguration->GetTitle().c_str(), data.bairro);
-				Info(REVGEO_TAG "%s - Municipio: %s", pConfiguration->GetTitle().c_str(), data.municipio);
-				Info(REVGEO_TAG "%s - Uf: %s", pConfiguration->GetTitle().c_str(), data.uf);
-				Info(REVGEO_TAG "%s - Numero: %s", pConfiguration->GetTitle().c_str(), data.numero);
-				Info(REVGEO_TAG "%s - Pais: %s", pConfiguration->GetTitle().c_str(), data.pais);
+				// Get mongodb attributes to use as entry data
+				int veiculo = query_res.getField("veiculo").Number();
 
-				// Update mongodb position data
-				this->UpdatePosition(&data, veiculo);
-			}
-			else
-			{
-				Info(REVGEO_TAG "%s - Can't get JSON data", pConfiguration->GetTitle().c_str());
-				continue;
-			}
+				double lon = query_res.getFieldDotted("coordenadas.coordinates.0").Double();
+				double lat = query_res.getFieldDotted("coordenadas.coordinates.1").Double();
 
-			Info(REVGEO_TAG "%s - --------------------", pConfiguration->GetTitle().c_str());
+				// Init the struct with empty values to storage callback values
+				endereco_posicao_mapa data = (const struct endereco_posicao_mapa){ NULL };
+
+				Info(REVGEO_TAG "%s - --------------------", pConfiguration->GetTitle().c_str());
+				Info(REVGEO_TAG "%s - OID: %d", pConfiguration->GetTitle().c_str(), query_res.getField("_id"));
+				Info(REVGEO_TAG "%s - Veiculo: %d", pConfiguration->GetTitle().c_str(), veiculo);
+
+				// Create the URL
+				geoWeb.Url(pConfiguration->GetServiceURL().c_str(), lat, lon, pConfiguration->GetServiceKey().c_str());
+
+				// Call a WS for reverse geolocation
+				if(geoWeb.revGeoWeb(&data, pConfiguration->GetServiceTimeOut()))
+				{
+					Info(REVGEO_TAG "%s - Rua: %s", pConfiguration->GetTitle().c_str(), data.rua);
+					Info(REVGEO_TAG "%s - Bairro: %s", pConfiguration->GetTitle().c_str(), data.bairro);
+					Info(REVGEO_TAG "%s - Municipio: %s", pConfiguration->GetTitle().c_str(), data.municipio);
+					Info(REVGEO_TAG "%s - Uf: %s", pConfiguration->GetTitle().c_str(), data.uf);
+					Info(REVGEO_TAG "%s - Numero: %s", pConfiguration->GetTitle().c_str(), data.numero);
+					Info(REVGEO_TAG "%s - Pais: %s", pConfiguration->GetTitle().c_str(), data.pais);
+
+					// Update mongodb position data
+					this->UpdatePosition(&data, veiculo);
+				}
+				else
+				{
+					Info(REVGEO_TAG "%s - Can't get JSON data", pConfiguration->GetTitle().c_str());
+					continue;
+				}
+
+				Info(REVGEO_TAG "%s - --------------------", pConfiguration->GetTitle().c_str());
+			}
+			else continue;
 		}
 		Info(REVGEO_TAG "%s - Finish processing...", pConfiguration->GetTitle().c_str());
 
