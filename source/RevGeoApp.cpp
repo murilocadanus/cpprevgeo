@@ -209,7 +209,7 @@ bool RevGeoApp::Shutdown()
 	// Disconnect from mongodb
 	BSONObj info;
 	cDBConnection.logout(pConfiguration->GetMongoDBHost(), info);
-	Info(REVGEO_TAG "%s - Disconnected from mongodb...", pConfiguration->GetTitle().c_str());
+	Info(REVGEO_TAG "%s - Disconnected from mongodb", pConfiguration->GetTitle().c_str());
 
 	// Config a time to wait until the next process
 	sleep(pConfiguration->GetSleepProcessInterval());
