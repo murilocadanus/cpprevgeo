@@ -18,19 +18,21 @@ const BSONObj RevGeoApp::kQueryGet = BSON("$and" << BSON_ARRAY(
 									));
 
 RevGeoApp::RevGeoApp()
+	: cDBConnection()
 {
+	// Init mongo client
+	mongo::client::initialize();
 }
 
 RevGeoApp::~RevGeoApp()
 {
+	// Release mongodb connection
+	mongo::client::shutdown(0);
 }
 
 bool RevGeoApp::Initialize()
 {
 	Info(REVGEO_TAG "%s - Initializing...", pConfiguration->GetTitle().c_str());
-
-	// Init mongo client
-	mongo::client::initialize();
 
 	// Set service header
 	struct curl_slist *headers;
