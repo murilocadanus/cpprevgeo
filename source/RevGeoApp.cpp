@@ -136,7 +136,7 @@ bool RevGeoApp::Process()
 						buffer.clear();
 
 						// Verify data
-						if (!document["results"].IsArray() && document["results"].Size() > 0)
+						if (!document["results"].IsArray() && document["results"].Size() <= 0)
 						{
 							Info(REVGEO_TAG "%s - Can't get JSON results data", pConfiguration->GetTitle().c_str());
 							continue;
