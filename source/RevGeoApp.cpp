@@ -1,8 +1,13 @@
 #include "RevGeoApp.hpp"
-#include "location/libGeoWeb.hpp"
 #include "Configuration.hpp"
+#include <cstdarg>
+#include <rapidjson/document.h>
+#include <rapidjson/prettywriter.h>
+#include <rapidjson/reader.h>
 
 #define REVGEO_TAG "[RevGeo] "
+
+using namespace rapidjson;
 
 const BSONObj RevGeoApp::kQueryGet = BSON("$and" << BSON_ARRAY(
 										OR(	BSON("endereco" << ""),
@@ -12,6 +17,20 @@ const BSONObj RevGeoApp::kQueryGet = BSON("$and" << BSON_ARRAY(
 											BSON("coordenadas.coordinates.0" << BSON("$lt" << 0)),
 											BSON("coordenadas.coordinates.1" << BSON("$lt" << 0)))
 									));
+
+static std::string buffer;
+
+static int writer(char *data, size_t size, size_t nmemb, std::string *buffer)
+{
+	int result = 0;
+	if (buffer != NULL)
+	{
+		buffer->append(data, size * nmemb);
+		result = size * nmemb;
+	}
+
+	return result;
+}
 
 RevGeoApp::RevGeoApp()
 {
@@ -27,6 +46,20 @@ bool RevGeoApp::Initialize()
 
 	// Init mongo client
 	mongo::client::initialize();
+
+	// Set service header
+	struct curl_slist *headers;
+	headers = NULL;
+	headers = curl_slist_append(headers, "Accept: application/json");
+	headers = curl_slist_append(headers, "Content-Type: application/json");
+	headers = curl_slist_append(headers, "charset: utf-8");
+
+	// Set service parameters
+	cService.SetOption(CURLOPT_HTTPHEADER, headers);
+	cService.SetOption(CURLOPT_HTTPGET, 1);
+	cService.SetOption(CURLOPT_WRITEFUNCTION, writer);
+	cService.SetOption(CURLOPT_WRITEDATA, &buffer);
+	cService.SetOption(CURLOPT_TIMEOUT, pConfiguration->GetServiceTimeOut());
 
 	// Connect to mongo client
 	try
@@ -45,7 +78,6 @@ bool RevGeoApp::Initialize()
 bool RevGeoApp::Process()
 {
 	Info(REVGEO_TAG "%s - Start processing...", pConfiguration->GetTitle().c_str());
-	LibGeoWeb geoWeb;
 
 	try
 	{
@@ -77,20 +109,82 @@ bool RevGeoApp::Process()
 				Info(REVGEO_TAG "%s - Veiculo: %d", pConfiguration->GetTitle().c_str(), veiculo);
 
 				// Create the URL
-				geoWeb.Url(pConfiguration->GetServiceURL().c_str(), lat, lon, pConfiguration->GetServiceKey().c_str());
+				Url(pConfiguration->GetServiceURL().c_str(), lat, lon, pConfiguration->GetServiceKey().c_str());
+
+				// Set the url with parameters into the service
+				cService.SetOption(CURLOPT_URL, urlWithParams);
 
 				// Call a WS for reverse geolocation
-				if(geoWeb.revGeoWeb(&data, pConfiguration->GetServiceTimeOut()))
-				{
-					Info(REVGEO_TAG "%s - Rua: %s", pConfiguration->GetTitle().c_str(), data.rua);
-					Info(REVGEO_TAG "%s - Bairro: %s", pConfiguration->GetTitle().c_str(), data.bairro);
-					Info(REVGEO_TAG "%s - Municipio: %s", pConfiguration->GetTitle().c_str(), data.municipio);
-					Info(REVGEO_TAG "%s - Uf: %s", pConfiguration->GetTitle().c_str(), data.uf);
-					Info(REVGEO_TAG "%s - Numero: %s", pConfiguration->GetTitle().c_str(), data.numero);
-					Info(REVGEO_TAG "%s - Pais: %s", pConfiguration->GetTitle().c_str(), data.pais);
+				cService.Perform();
 
-					// Update mongodb position data
-					this->UpdatePosition(&data, veiculo);
+				if(cService.IsOK())
+				{
+					Document document;
+
+					// Parse response as JSON
+					if (document.Parse<0>(buffer.c_str()).HasParseError())
+					{
+						// Clear buffer for new iteraction
+						buffer.clear();
+
+						Info(REVGEO_TAG "%s - Can't parse JSON data", pConfiguration->GetTitle().c_str());
+						continue;
+					}
+					else
+					{
+						// Clear buffer for new iteraction
+						buffer.clear();
+
+						// Verify data
+						if (!document["results"].IsArray() && document["results"].Size() > 0)
+						{
+							Info(REVGEO_TAG "%s - Can't get JSON results data", pConfiguration->GetTitle().c_str());
+							continue;
+						}
+						else if(!document["results"][0]["address_components"].IsArray())
+						{
+							Info(REVGEO_TAG "%s - Can't get JSON address components data", pConfiguration->GetTitle().c_str());
+							continue;
+						}
+						else
+						{
+							const Value& results = document["results"];
+							const Value& addresses = results[0]["address_components"];
+
+							for (SizeType i = 0; i < addresses.Size(); i++)
+							{
+								std::string type = addresses[i]["types"][0].GetString();
+
+								if (type == "country")
+									strcpy(data.pais, addresses[i]["short_name"].GetString());
+
+								if (type == "administrative_area_level_1")
+									strcpy(data.uf, addresses[i]["short_name"].GetString());
+
+								if (type == "locality")
+									strcpy(data.municipio, addresses[i]["long_name"].GetString());
+
+								if (type == "sublocality_level_1")
+									strcpy(data.bairro, addresses[i]["long_name"].GetString());
+
+								if (type == "route")
+									strcpy(data.rua, addresses[i]["long_name"].GetString());
+
+								if (type == "street_number")
+									strcpy(data.numero, addresses[i]["long_name"].GetString());
+							}
+
+							Info(REVGEO_TAG "%s - Rua: %s", pConfiguration->GetTitle().c_str(), data.rua);
+							Info(REVGEO_TAG "%s - Bairro: %s", pConfiguration->GetTitle().c_str(), data.bairro);
+							Info(REVGEO_TAG "%s - Municipio: %s", pConfiguration->GetTitle().c_str(), data.municipio);
+							Info(REVGEO_TAG "%s - Uf: %s", pConfiguration->GetTitle().c_str(), data.uf);
+							Info(REVGEO_TAG "%s - Numero: %s", pConfiguration->GetTitle().c_str(), data.numero);
+							Info(REVGEO_TAG "%s - Pais: %s", pConfiguration->GetTitle().c_str(), data.pais);
+
+							// Update mongodb position data
+							this->UpdatePosition(&data, veiculo);
+						}
+					}
 				}
 				else
 				{
@@ -169,4 +263,13 @@ void RevGeoApp::UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId
 
 	// Updating based on vehicle id with multiple parameter
 	cDBConnection.update(pConfiguration->GetMongoDBCollection(), query, querySet, false, true);
+}
+
+void RevGeoApp::Url(const char *message, ...)
+{
+	va_list ap;
+
+	va_start(ap, message);
+	vsnprintf(urlWithParams, 2048, message, ap);
+	va_end(ap);
 }
