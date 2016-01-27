@@ -1,5 +1,4 @@
 #ifndef __REVGEO_H__
-
 #define __REVGEO_H__
 
 #define NESTADOS 27

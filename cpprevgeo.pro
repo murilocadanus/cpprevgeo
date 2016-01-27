@@ -3,7 +3,7 @@ SOURCES +=	source/main.cpp \
 
 HEADERS +=	include/RevGeoApp.hpp \
 			include/Defines.hpp \
-			include/revgeo.hpp
+			include/entities/Location.hpp
 
 OTHER_FILES += resources/app.config \
 

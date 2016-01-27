@@ -1,6 +1,5 @@
 #include "RevGeoApp.hpp"
 #include "Configuration.hpp"
-#include <cstdarg>
 #include <rapidjson/document.h>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/reader.h>
@@ -17,20 +16,6 @@ const BSONObj RevGeoApp::kQueryGet = BSON("$and" << BSON_ARRAY(
 											BSON("coordenadas.coordinates.0" << BSON("$lt" << 0)),
 											BSON("coordenadas.coordinates.1" << BSON("$lt" << 0)))
 									));
-
-static std::string buffer;
-
-static int writer(char *data, size_t size, size_t nmemb, std::string *buffer)
-{
-	int result = 0;
-	if (buffer != NULL)
-	{
-		buffer->append(data, size * nmemb);
-		result = size * nmemb;
-	}
-
-	return result;
-}
 
 RevGeoApp::RevGeoApp()
 {
@@ -57,8 +42,8 @@ bool RevGeoApp::Initialize()
 	// Set service parameters
 	cService.SetOption(CURLOPT_HTTPHEADER, headers);
 	cService.SetOption(CURLOPT_HTTPGET, 1);
-	cService.SetOption(CURLOPT_WRITEFUNCTION, writer);
-	cService.SetOption(CURLOPT_WRITEDATA, &buffer);
+	cService.SetOption(CURLOPT_WRITEFUNCTION, CurlWrapper::Writer);
+	cService.SetOption(CURLOPT_WRITEDATA, &CurlWrapper::sBuffer);
 	cService.SetOption(CURLOPT_TIMEOUT, pConfiguration->GetServiceTimeOut());
 
 	// Connect to mongo client
@@ -109,10 +94,10 @@ bool RevGeoApp::Process()
 				Info(REVGEO_TAG "%s - Veiculo: %d", pConfiguration->GetTitle().c_str(), veiculo);
 
 				// Create the URL
-				Url(pConfiguration->GetServiceURL().c_str(), lat, lon, pConfiguration->GetServiceKey().c_str());
+				cService.UrlComposer(pConfiguration->GetServiceURL().c_str(), lat, lon, pConfiguration->GetServiceKey().c_str());
 
 				// Set the url with parameters into the service
-				cService.SetOption(CURLOPT_URL, urlWithParams);
+				cService.SetOption(CURLOPT_URL, cService.GetUrlWithParams());
 
 				// Call a WS for reverse geolocation
 				cService.Perform();
@@ -122,10 +107,10 @@ bool RevGeoApp::Process()
 					Document document;
 
 					// Parse response as JSON
-					if (document.Parse<0>(buffer.c_str()).HasParseError())
+					if (document.Parse<0>(CurlWrapper::sBuffer.c_str()).HasParseError())
 					{
 						// Clear buffer for new iteraction
-						buffer.clear();
+						CurlWrapper::sBuffer.clear();
 
 						Info(REVGEO_TAG "%s - Can't parse JSON data", pConfiguration->GetTitle().c_str());
 						continue;
@@ -133,10 +118,13 @@ bool RevGeoApp::Process()
 					else
 					{
 						// Clear buffer for new iteraction
-						buffer.clear();
+						CurlWrapper::sBuffer.clear();
+
+						// Retrieve results
+						const Value& results = document["results"];
 
 						// Verify data
-						if (document["results"].Size() <= 0)
+						if (results.Size() <= 0)
 						{
 							Info(REVGEO_TAG "%s - Zero results", pConfiguration->GetTitle().c_str());
 
@@ -145,14 +133,13 @@ bool RevGeoApp::Process()
 
 							continue;
 						}
-						else if(!document["results"][0]["address_components"].IsArray())
+						else if(!results[0]["address_components"].IsArray())
 						{
 							Info(REVGEO_TAG "%s - Can't get JSON address components data", pConfiguration->GetTitle().c_str());
 							continue;
 						}
 						else
 						{
-							const Value& results = document["results"];
 							const Value& addresses = results[0]["address_components"];
 
 							for (SizeType i = 0; i < addresses.Size(); i++)
@@ -204,21 +191,14 @@ bool RevGeoApp::Process()
 				continue;
 			}
 		}
+
 		Info(REVGEO_TAG "%s - Finish processing...", pConfiguration->GetTitle().c_str());
-
-		// Config a time to wait until the next process
-		sleep(pConfiguration->GetSleepProcessInterval());
-
 		return EXIT_SUCCESS;
 	}
 	catch(const mongo::DBException &e)
 	{
 		Error(REVGEO_TAG "%s - Failed to connect to mongodb: %s", pConfiguration->GetTitle().c_str(), e.what());
-
-		// Force to ignore excptions
-		//return EXIT_FAILURE;
-
-		return EXIT_SUCCESS;
+		return EXIT_FAILURE;
 	}
 }
 
@@ -226,10 +206,13 @@ bool RevGeoApp::Shutdown()
 {
 	Info(REVGEO_TAG "%s - Shutting down...", pConfiguration->GetTitle().c_str());
 
-	// Desconnect from mongodb
+	// Disconnect from mongodb
 	BSONObj info;
 	cDBConnection.logout(pConfiguration->GetMongoDBHost(), info);
 	Info(REVGEO_TAG "%s - Disconnected from mongodb...", pConfiguration->GetTitle().c_str());
+
+	// Config a time to wait until the next process
+	sleep(pConfiguration->GetSleepProcessInterval());
 
 	return true;
 }
@@ -269,11 +252,3 @@ void RevGeoApp::UpdatePosition(struct endereco_posicao_mapa *data, int veiculoId
 	cDBConnection.update(pConfiguration->GetMongoDBCollection(), query, querySet, false, true);
 }
 
-void RevGeoApp::Url(const char *message, ...)
-{
-	va_list ap;
-
-	va_start(ap, message);
-	vsnprintf(urlWithParams, 2048, message, ap);
-	va_end(ap);
-}
