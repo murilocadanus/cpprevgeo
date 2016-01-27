@@ -136,9 +136,13 @@ bool RevGeoApp::Process()
 						buffer.clear();
 
 						// Verify data
-						if (!document["results"].IsArray() && document["results"].Size() <= 0)
+						if (document["results"].Size() <= 0)
 						{
-							Info(REVGEO_TAG "%s - Can't get JSON results data", pConfiguration->GetTitle().c_str());
+							Info(REVGEO_TAG "%s - Zero results", pConfiguration->GetTitle().c_str());
+
+							// Update mongodb position with revgeo data
+							this->UpdatePosition(&data, veiculo);
+
 							continue;
 						}
 						else if(!document["results"][0]["address_components"].IsArray())
@@ -181,7 +185,7 @@ bool RevGeoApp::Process()
 							Info(REVGEO_TAG "%s - Numero: %s", pConfiguration->GetTitle().c_str(), data.numero);
 							Info(REVGEO_TAG "%s - Pais: %s", pConfiguration->GetTitle().c_str(), data.pais);
 
-							// Update mongodb position data
+							// Update mongodb position with revgeo data
 							this->UpdatePosition(&data, veiculo);
 						}
 					}
