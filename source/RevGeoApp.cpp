@@ -108,6 +108,7 @@ bool RevGeoApp::Process()
 				{
 					Document document;
 
+					Info(REVGEO_TAG "%s - Url: %s", pConfiguration->GetTitle().c_str(), cService.GetUrlWithParams());
 					// Parse response as JSON
 					if (document.Parse<0>(CurlWrapper::sBuffer.c_str()).HasParseError())
 					{
@@ -125,14 +126,24 @@ bool RevGeoApp::Process()
 						// Retrieve results
 						const Value& results = document["results"];
 
+
 						// Verify data
 						if (results.Size() <= 0)
 						{
-							Info(REVGEO_TAG "%s - Zero results", pConfiguration->GetTitle().c_str());
+							std::string status = document["status"].GetString();
 
-							// Update mongodb position with revgeo data
-							this->UpdatePosition(&data, veiculo);
+							// Verify hash key limit return
+							if (status == "OVER_QUERY_LIMIT")
+							{
+								Info(REVGEO_TAG "%s - Over query limit with key: %s", pConfiguration->GetTitle().c_str(), pConfiguration->GetServiceKey().c_str());
+							}
+							else
+							{
+								Info(REVGEO_TAG "%s - Zero results", pConfiguration->GetTitle().c_str());
 
+								// Update mongodb position with revgeo data
+								this->UpdatePosition(&data, veiculo);
+							}
 							continue;
 						}
 						else if(!results[0]["address_components"].IsArray())
