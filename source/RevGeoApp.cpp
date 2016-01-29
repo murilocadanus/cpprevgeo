@@ -69,8 +69,8 @@ bool RevGeoApp::Process()
 	try
 	{
 		// Get total position
-		int countToUpdate = this->GetCountPosition();
-		Info(REVGEO_TAG "%s - Total data gathered from position collection: %d", pConfiguration->GetTitle().c_str(), countToUpdate);
+		//int countToUpdate = this->GetCountPosition();
+		//Info(REVGEO_TAG "%s - Total data gathered from position collection: %d", pConfiguration->GetTitle().c_str(), countToUpdate);
 
 		// Get position
 		std::auto_ptr<DBClientCursor> cursor = cDBConnection.query(pConfiguration->GetMongoDBCollection(), kQueryGet, pConfiguration->GetQueryLimit());
